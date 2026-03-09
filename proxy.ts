@@ -11,13 +11,8 @@ export default async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const isPrivate = PRIVATE_ROUTES.some((route) =>
-    pathname.startsWith(route)
-  );
-
-  const isAuth = AUTH_ROUTES.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isPrivate = PRIVATE_ROUTES.some((route) => pathname.startsWith(route));
+  const isAuth = AUTH_ROUTES.some((route) => pathname.startsWith(route));
 
   if (!accessToken && !refreshToken && isPrivate) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
@@ -30,16 +25,26 @@ export default async function proxy(request: NextRequest) {
       const nextResponse = NextResponse.next();
 
       const setCookies = res.headers["set-cookie"];
-
       if (setCookies) {
-        setCookies.forEach((cookie) => {
-          nextResponse.headers.append("Set-Cookie", cookie);
-        });
+        if (typeof setCookies === "string") {
+          nextResponse.headers.append("Set-Cookie", setCookies);
+        } else {
+          setCookies.forEach((cookie) => {
+            nextResponse.headers.append("Set-Cookie", cookie);
+          });
+        }
+      }
+
+      if (isAuth) {
+        return NextResponse.redirect(new URL("/", request.url));
       }
 
       return nextResponse;
-    } catch {
-      return NextResponse.redirect(new URL("/sign-in", request.url));
+    } catch (err) {
+      if (isPrivate) {
+        return NextResponse.redirect(new URL("/sign-in", request.url));
+      }
+      return NextResponse.next();
     }
   }
 
